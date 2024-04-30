@@ -443,10 +443,42 @@ class TimeSeries:
 
         self.ews["kurtosis"] = kurt_values
 
-    def compute_ktau(self, tmin="earliest", tmax="latest"):
-        """
+        def kendall_pval(self, x,y):
+        '''
+        Function to compute the kendall tau values of CSD-based EWS
+        together with the respective p-value.
+
+        Parameters
+        ----------
+        x : Pandas Dataframe
+        y : Pandas Series
+        variant: 'b' or 'c'
+            tau-b (the default) and tau-c (also known as Stuart’s tau-c)
+
+        '''
+        return kendalltau(x, y, variant = 'b')
+
+
+    def kendall_pval_c(self, x,y):
+        '''
+        Function to compute the kendall tau values of CSD-based EWS
+        together with the respective p-value.
+
+        Parameters
+        ----------
+        x : Pandas Dataframe
+        y : Pandas Series
+        variant: 'b' or 'c'
+            tau-b (the default) and tau-c (also known as Stuart’s tau-c)
+
+        '''
+        return kendalltau(x, y, variant = 'c')
+
+
+    def compute_ktau(self, tmin='earliest', tmax='latest',  variant = 'b'):
+        '''
         Compute kendall tau values of CSD-based EWS.
-        Output is placed in the attribute *ktau*, which is a Python
+        Output is placed in the attribute *ktau*, which is a Python 
         dictionary contianing Kendall tau values for each CSD-based EWS.
 
         Parameters
@@ -459,25 +491,35 @@ class TimeSeries:
             taken as latest time point in EWS time series, which could be
             the end of the state time series, or a defined transtion point.
 
-        """
-
+        '''
+        
+        
         # Get tmin and tmax values if using extrema
-        if tmin == "earliest":
+        if tmin == 'earliest':
             tmin = self.ews.dropna().index[0]
-
-        if tmax == "latest":
+        
+        if tmax == 'latest':
             tmax = self.ews.dropna().index[-1]
-
+        
         # Get cropped data
-        df_ews = self.ews[(self.ews.index >= tmin) & (self.ews.index <= tmax)].copy()
-
+        df_ews = self.ews[(self.ews.index >= tmin) &\
+                          (self.ews.index <= tmax)].copy()
+        
         # Include smax in Kendall tau computation if it exists
-        if "smax" in self.ews_spec.columns:
-            df_ews = df_ews.join(self.ews_spec["smax"])
-
+        if 'smax' in self.ews_spec.columns:
+            df_ews = df_ews.join(self.ews_spec['smax'])
+            
         # Make a series with the time values
         time_values = pd.Series(data=df_ews.index, index=df_ews.index)
-        ktau_out = df_ews.corrwith(time_values, method="kendall", axis=0)
+
+        if variant == 'b':
+            ktau_out = df_ews.corrwith(time_values, method = self.kendall_pval, axis=0)
+        else:
+            print('C')
+            ktau_out = df_ews.corrwith(time_values, method = self.kendall_pval_c, axis=0)
+
+        ktau_out.set_index(pd.Index(['ktau', 'pvalue']), drop = True, inplace = True)
+
         self.ktau = dict(ktau_out)
 
     def apply_classifier(self, classifier, tmin, tmax, name="c1", verbose=1):
